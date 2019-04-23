@@ -21,9 +21,9 @@ ls -1 NKP/*.lstmf  > build/san.NKP.training_files.txt
 sed -i -e '/eval/d' build/san.NKP.training_files.txt
 ls -1 NKP/*eval*.lstmf >  build/san.NKP_eval.training_files.txt
 
-rm build/*checkpoint *.traineddata
+rm build/*checkpoint  NKP*.traineddata
 
-# review the console output with debug_levl -1 for 100 iterations
+# review the console output with debug_level -1 for 100 iterations
 # if there are glaring differences in OCR output and groundtruth, review the Wordstr box files
 
 lstmtraining \
@@ -36,7 +36,7 @@ lstmtraining \
 
 # eval error is minimum at 700 iterations
 
-for num_iterations in {300..1000..100}; do
+for num_iterations in {300..700..100}; do
 
 lstmtraining \
   --model_output build/NKP \
@@ -60,7 +60,24 @@ lstmeval \
 done
 
 time tesseract NKP/NKP-eval.png build/NKP-eval -l san_NKP --tessdata-dir ./ --psm 6 --dpi 300
-wdiff -3 -s  NKP/NKP-eval.gt.txt  build/NKP-eval.txt > build/NKP-diff.txt
+wdiff -3 -s  NKP/NKP-eval.gt.txt  build/NKP-eval.txt 
+
+echo "Convert to Integer Model"
+
+lstmtraining \
+  --stop_training \
+  --convert_to_int \
+  --continue_from build/NKP_checkpoint \
+  --traineddata ~/tessdata_best/script/Devanagari.traineddata \
+  --model_output san_NKP_int.traineddata
+
+lstmeval \
+  --verbosity -1 \
+  --model san_NKP_int.traineddata \
+  --eval_listfile build/san.NKP_eval.training_files.txt 
+  
+time tesseract NKP/NKP-eval.png build/NKP_int-eval -l san_NKP_int --tessdata-dir ./ --psm 6 --dpi 300
+wdiff -3 -s  NKP/NKP-eval.gt.txt  build/NKP_int-eval.txt 
 
 echo "Compare with Devanagari"
 
@@ -70,4 +87,15 @@ lstmeval \
   --eval_listfile build/san.NKP_eval.training_files.txt 
 
 time tesseract NKP/NKP-eval.png build/NKP-eval-deva -l script/Devanagari  --psm 6  --dpi 300
-wdiff -3 -s  NKP/NKP-eval.gt.txt  build/NKP-eval-deva.txt > build/NKP-diff-deva.txt
+wdiff -3 -s  NKP/NKP-eval.gt.txt  build/NKP-eval-deva.txt 
+
+echo "Compare with Sanskrit"
+
+lstmeval \
+  --verbosity -1 \
+  --model ~/tessdata_best/san.traineddata \
+  --eval_listfile build/san.NKP_eval.training_files.txt 
+  
+time tesseract NKP/NKP-eval.png build/NKP-eval-san -l san  --psm 6  --dpi 300
+wdiff -3 -s  NKP/NKP-eval.gt.txt  build/NKP-eval-san.txt 
+
